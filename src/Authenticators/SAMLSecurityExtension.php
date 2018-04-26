@@ -27,6 +27,7 @@ class SAMLSecurityExtension extends Extension
      */
     public function onBeforeSecurityLogin()
     {
+
         // by going to the URL Security/login?showloginform=1 we bypass the auto sign on
         if ($this->owner->request->getVar('showloginform') == 1) {
             return;
@@ -38,10 +39,12 @@ class SAMLSecurityExtension extends Extension
         if ($member && $member->exists()) {
             return;
         }
+
         $session = $this->owner->getRequest()->getSession();
         // if there are form messages, don't auto-sign-on, this is most likely because of
         // login errors / failures or other notices.
         if ($session->get('FormInfo')) {
+            
             // since FormInfo can be a "nulled" array, we have to check
             foreach ($session->get('FormInfo') as $form => $info) {
                 foreach ($info as $name => $value) {
