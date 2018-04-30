@@ -18,7 +18,7 @@ SilverStripe\Core\Injector\Injector:
   SAMLConfService: SilverStripe\SAML\Services\SAMLConfiguration
 
 SilverStripe\SAML\Authenticators\SAMLAuthenticator:
-  name: "SAML"
+  name: "Hawk ID"
 
 SilverStripe\SAML\Services\SAMLConfiguration:
   strict: true
