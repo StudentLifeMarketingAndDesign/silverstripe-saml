@@ -1,5 +1,5 @@
 {
-    "name": "silverstripe/saml",
+    "name": "md/saml",
     "description": "Adds SSO/SAML authentication support to SilverStripe",
     "type": "silverstripe-module",
     "keywords": ["silverstripe", "ad", "active", "directory", "sso", "saml"],
