@@ -13,6 +13,7 @@ use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
+use SilverStripe\Security\IdentityStore;
 
 /**
  * Class SAMLController
@@ -93,7 +94,12 @@ class SAMLController extends Controller
         if (!($member && $member->exists())) {
             $member = new Member();
             $member->GUID = $guid;
+            $member->write();
+            
         }
+        // Security::setCurrentUser($member);
+
+        Injector::inst()->get(IdentityStore::class)->logIn($member);
 
         $attributes = $auth->getAttributes();
 
@@ -114,14 +120,16 @@ class SAMLController extends Controller
         }
 
         $member->SAMLSessionIndex = $auth->getSessionIndex();
-
+        $member->write();
         // This will trigger LDAP update through LDAPMemberExtension::memberLoggedIn.
         // The LDAP update will also write the Member record. We shouldn't write before
         // calling this, as any onAfterWrite hooks that attempt to update LDAP won't
         // have the Username field available yet for new Member records, and fail.
         // Both SAML and LDAP identify Members by the GUID field.
-        Security::setCurrentUser($member);
 
+        // $member->write();
+        
+        // print_r(Security::getCurrentUser());
         return $this->getRedirect();
     }
 

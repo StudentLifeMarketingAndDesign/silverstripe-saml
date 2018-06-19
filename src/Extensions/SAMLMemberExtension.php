@@ -32,9 +32,10 @@ class SAMLMemberExtension extends DataExtension
      * @config
      */
     private static $claims_field_mappings = [
-        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname' => 'FirstName',
-        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname' => 'Surname',
-        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' => 'Email'
+        'urn:oid:2.5.4.42' => 'FirstName',
+        'urn:oid:2.5.4.4' => 'Surname',
+        'urn:oid:0.9.2342.19200300.100.1.3' => 'Email',
+        'silverstripeRoles' => 'silverstripeRoles'
     ];
 
     public function updateValidator($validator){

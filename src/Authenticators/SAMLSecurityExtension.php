@@ -8,7 +8,7 @@ use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Security\Authenticator;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
-
+use SilverStripe\Control\Director;
 /**
  * Class SAMLSecurityExtension
  *
@@ -16,6 +16,9 @@ use SilverStripe\Security\Security;
  */
 class SAMLSecurityExtension extends Extension
 {
+    private static $allowed_actions = array(
+        'SamlLogout'
+    );
     /**
      * Will redirect the user directly to the IdP login endpoint if:
      *
@@ -61,5 +64,16 @@ class SAMLSecurityExtension extends Extension
         }
 
         $this->owner->getRequest()->getSession()->set('BackURL', $backURL);
+    }
+
+    public function SamlLogout(){
+        $member = Member::currentUser();
+        if($member) $member->logOut();
+        if(Director::isLive()){
+            $this->owner->redirect('https://idp.uiowa.edu/idp/profile/Logout');
+        }else{
+           $this->owner->redirect('https://idp-test.uiowa.edu/idp/profile/Logout'); 
+        }
+        
     }
 }

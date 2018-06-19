@@ -5,6 +5,8 @@ use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\ReadonlyField;
 use SilverStripe\Forms\LiteralField;
 use SilverStripe\ORM\DataExtension;
+use SilverStripe\Security\Group;
+use SilverStripe\Core\Environment;
 
 	class ActiveDirectoryMemberExtension extends DataExtension {
 
@@ -34,7 +36,6 @@ use SilverStripe\ORM\DataExtension;
 					$contentEditorsGroup->Members()->remove($this->owner);
 				}
 			}
-
 			//If the local user doesn't have a GUID yet, look it up and set some basic attributes:
 			if(!$guid){
 				$userLookup = $this->lookupUser($email);
@@ -49,8 +50,8 @@ use SilverStripe\ORM\DataExtension;
 		private function lookupUser($email){
 			set_time_limit(30);
 			$ldapserver = 'iowa.uiowa.edu';
-			$ldapuser      =  AD_SERVICEID_USER;  
-			$ldappass     = AD_SERVICEID_PASS;
+			$ldapuser      =  Environment::getEnv('AD_SERVICEID_USER'); 
+			$ldappass     = Environment::getEnv('AD_SERVICEID_PASS');
 			$ldaptree    = "DC=iowa, DC=uiowa, DC=edu";
 
 			$ldapconn = ldap_connect($ldapserver) or die("Could not connect to LDAP server.");
@@ -66,6 +67,7 @@ use SilverStripe\ORM\DataExtension;
 						$result = ldap_search($ldapconn,$ldaptree, "uiowaADNotificationAddress=".$email, array("uiowaADNotificationAddress=","sn", "givenName", "objectGUID", "memberOf")) or die ("Error in search query: ".ldap_error($ldapconn));
 						
 			        	$data = ldap_get_entries($ldapconn, $result);
+
 			        	if($data["count"] == 1){
 			        		$memberGuid = $this->GUIDtoStr($data[0]["objectguid"][0]);
 			        		$resultArray['guid'] = $memberGuid;

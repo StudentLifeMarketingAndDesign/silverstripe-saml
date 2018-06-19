@@ -65,11 +65,11 @@ class SAMLConfiguration
             : sprintf('%s/%s', BASE_PATH, $sp['privateKey']);
 
         // set baseurl for SAML messages coming back to the SP
-        $conf['baseurl'] = $sp['entityId'];
+        //$conf['baseurl'] = $sp['entityId'];
 
         $conf['sp']['entityId'] = $sp['entityId'];
         $conf['sp']['assertionConsumerService'] = [
-            'url' => Director::absoluteBaseURL() . '/saml/acs',
+            'url' => Director::absoluteBaseURL() . 'saml/acs',
             'binding' => OneLogin_Saml2_Constants::BINDING_HTTP_POST
         ];
         $conf['sp']['NameIDFormat'] = isset($sp['nameIdFormat']) ?
