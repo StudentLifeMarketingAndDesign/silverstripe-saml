@@ -20,6 +20,7 @@ use SilverStripe\Core\Environment;
 
 		public function onBeforeWrite(){
 			$silverstripeRoles = $this->owner->obj('silverstripeRoles')->getValue();
+			
 			$adminGroup = Group::get()->filter(array('Title' => 'Administrators'))->First();
 			$contentEditorsGroup = Group::get()->filter(array('Title' => 'Content Authors'))->First();
 			$guid = $this->owner->GUID;
