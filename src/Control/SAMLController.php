@@ -3,25 +3,34 @@
 namespace SilverStripe\SAML\Control;
 
 use Exception;
-use OneLogin_Saml2_Error;
+use function gmmktime;
+use OneLogin\Saml2\Auth;
+use OneLogin\Saml2\Constants;
+use OneLogin\Saml2\Utils;
+use OneLogin\Saml2\Error;
 use Psr\Log\LoggerInterface;
+use SilverStripe\Core\Config\Config;
+use SilverStripe\ORM\ValidationResult;
+use SilverStripe\SAML\Authenticators\SAMLAuthenticator;
 use SilverStripe\SAML\Authenticators\SAMLLoginForm;
 use SilverStripe\SAML\Helpers\SAMLHelper;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\Director;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Core\Injector\Injector;
+use SilverStripe\SAML\Model\SAMLResponse;
+use SilverStripe\SAML\Services\SAMLConfiguration;
+use SilverStripe\Security\IdentityStore;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
-use SilverStripe\Security\IdentityStore;
+use function uniqid;
+
 
 /**
  * Class SAMLController
  *
- * This controller handles serving metadata requests for the IdP, as well as handling
- * creating new users and logging them into SilverStripe after being authenticated at the IdP.
- *
- * @package activedirectory
+ * This controller handles serving metadata requests for the identity provider (IdP), as well as handling the creation
+ * of new users and logging them into SilverStripe after being authenticated at the IdP.
  */
 class SAMLController extends Controller
 {
@@ -30,12 +39,14 @@ class SAMLController extends Controller
      */
     private static $allowed_actions = [
         'index',
-        'login',
-        'logout',
         'acs',
-        'sls',
         'metadata'
     ];
+
+    public function index()
+    {
+        return $this->redirect('/');
+    }
 
     /**
      * Assertion Consumer Service
@@ -47,51 +58,114 @@ class SAMLController extends Controller
      * if not existent), with the user already logged in. Login triggers memberLoggedIn hooks, which allows
      * LDAP side of this module to finish off loading Member data.
      *
-     * @throws OneLogin_Saml2_Error
+     * @throws Error
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     public function acs()
     {
+        /** @var Auth $auth */
         $auth = Injector::inst()->get(SAMLHelper::class)->getSAMLAuth();
-        $auth->processResponse();
+        $caughtException = null;
 
-        $error = $auth->getLastErrorReason();
-        if (!empty($error)) {
-            $this->getLogger()->error($error);
+        // Log both errors (reported by php-saml and thrown as exception) with a common ID for later tracking
+        $uniqueErrorId = uniqid('SAML-');
 
-            $this->getForm()->sessionMessage("Authentication error: '{$error}'", 'bad');
-            $this->getRequest()->getSession()->save($this->getRequest());
-            return $this->getRedirect();
+        // Force php-saml module to use the current absolute base URL (e.g. https://www.example.com/saml). This avoids
+        // errors that we otherwise get when having a multi-directory ACS URL like /saml/acs).
+        // See https://github.com/onelogin/php-saml/issues/249
+        Utils::setBaseURL(Controller::join_links($auth->getSettings()->getSPData()['entityId'], 'saml'));
+
+        // Attempt to process the SAML response. If there are errors during this, log them and redirect to the generic
+        // error page. Note: This does not necessarily include all SAML errors (e.g. we still need to confirm if the
+        // user is authenticated after this block
+        try {
+            $auth->processResponse();
+            $error = $auth->getLastErrorReason();
+        } catch (Exception $e) {
+            $caughtException = $e;
         }
 
-        if (!$auth->isAuthenticated()) {
-            $this->getForm()->sessionMessage(_t('SilverStripe\\Security\\Member.ERRORWRONGCRED'), 'bad');
+        // If there was an issue with the SAML response, if it was missing or if the SAML response indicates that they
+        // aren't authorised, then log the issue and provide a traceable error back to the user via the login form
+        $hasError = $caughtException || !empty($error);
+        if ($hasError || !$auth->isAuthenticated() || $this->checkForReplayAttack($auth, $uniqueErrorId)) {
+            if ($caughtException instanceof Exception) {
+                $this->getLogger()->error(sprintf(
+                    '[%s] [code: %s] %s (%s:%s)',
+                    $uniqueErrorId,
+                    $e->getCode(),
+                    $e->getMessage(),
+                    $e->getFile(),
+                    $e->getLine()
+                ));
+            }
+
+            if (!empty($error)) {
+                $this->getLogger()->error(sprintf('[%s] %s', $uniqueErrorId, $error));
+            }
+
+            $this->getForm()->sessionMessage(
+                _t(
+                    'SilverStripe\\SAML\\Control\\SAMLController.ERR_SAML_ACS_FAILURE',
+                    'Unfortunately we couldn\'t log you in. If this continues, please contact your I.T. department'
+                    . ' with the following reference: {ref}',
+                    ['ref' => $uniqueErrorId]
+                ),
+                ValidationResult::TYPE_ERROR
+            );
+
+            // Redirect the user back to the login form to display the generic error message and reference
             $this->getRequest()->getSession()->save($this->getRequest());
-            return $this->getRedirect();
+            return $this->redirect('Security/login');
         }
 
-        $decodedNameId = base64_decode($auth->getNameId());
-        // check that the NameID is a binary string (which signals that it is a guid
-        if (ctype_print($decodedNameId)) {
-            $this->getForm()->sessionMessage('Name ID provided by IdP is not a binary GUID.', 'bad');
-            $this->getRequest()->getSession()->save($this->getRequest());
-            return $this->getRedirect();
+        /**
+         * If processing reaches here, then the user is authenticated - the rest of this method is just processing their
+         * legitimate information and configuring their account.
+         */
+
+        // If we expect the NameID to be a binary version of the GUID (ADFS), check that it actually is
+        // If we are configured not to expect a binary NameID, then we assume it is a direct GUID (Azure AD)
+        if (Config::inst()->get(SAMLConfiguration::class, 'expect_binary_nameid')) {
+            $decodedNameId = base64_decode($auth->getNameId());
+            if (ctype_print($decodedNameId)) {
+                $this->getForm()->sessionMessage('NameID from IdP is not a binary GUID.', ValidationResult::TYPE_ERROR);
+                $this->getRequest()->getSession()->save($this->getRequest());
+                return $this->getRedirect();
+            }
+
+            // transform the NameId to guid
+            $helper = SAMLHelper::singleton();
+            $guid = $helper->binToStrGuid($decodedNameId);
+            if (!$helper->validGuid($guid)) {
+                $errorMessage = "Not a valid GUID '{$guid}' recieved from server.";
+                $this->getLogger()->error($errorMessage);
+                $this->getForm()->sessionMessage($errorMessage, ValidationResult::TYPE_ERROR);
+                $this->getRequest()->getSession()->save($this->getRequest());
+                return $this->getRedirect();
+            }
+        } else {
+            $guid = $auth->getNameId();
         }
 
-        // transform the NameId to guid
-        $helper = SAMLHelper::singleton();
-        $guid = $helper->binToStrGuid($decodedNameId);
-        if (!$helper->validGuid($guid)) {
-            $errorMessage = "Not a valid GUID '{$guid}' recieved from server.";
-            $this->getLogger()->error($errorMessage);
-            $this->getForm()->sessionMessage($errorMessage, 'bad');
-            $this->getRequest()->getSession()->save($this->getRequest());
-            return $this->getRedirect();
-        }
+        $attributes = $auth->getAttributes();
+
+        $fieldToClaimMap = array_flip(Member::config()->claims_field_mappings);
 
         // Write a rudimentary member with basic fields on every login, so that we at least have something
-        // if LDAP synchronisation fails.
+        // if there is no further sync (e.g. via LDAP)
         $member = Member::get()->filter('GUID', $guid)->limit(1)->first();
-        if (!($member && $member->exists())) {
+        if (!($member && $member->exists()) && Config::inst()->get(SAMLConfiguration::class, 'allow_insecure_email_linking') && isset($fieldToClaimMap['Email'])) {
+            // If there is no member found via GUID and we allow linking via email, search by email
+            $member = Member::get()->filter('Email', $attributes[$fieldToClaimMap['Email']])->limit(1)->first();
+
+            if (!($member && $member->exists())) {
+                $member = new Member();
+            }
+
+            $member->GUID = $guid;
+        } elseif (!($member && $member->exists())) {
+            // If the member doesn't exist and we don't allow linking via email, then create a new member
             $member = new Member();
             $member->GUID = $guid;
             $member->write();
@@ -101,13 +175,11 @@ class SAMLController extends Controller
 
         Injector::inst()->get(IdentityStore::class)->logIn($member);
 
-        $attributes = $auth->getAttributes();
-
         foreach ($member->config()->claims_field_mappings as $claim => $field) {
             if (!isset($attributes[$claim][0])) {
                 $this->getLogger()->warning(
                     sprintf(
-                        'Claim rule \'%s\' configured in LDAPMember.claims_field_mappings, ' .
+                        'Claim rule \'%s\' configured in SAMLMemberExtension.claims_field_mappings, ' .
                                 'but wasn\'t passed through. Please check IdP claim rules.',
                         $claim
                     )
@@ -120,12 +192,19 @@ class SAMLController extends Controller
         }
 
         $member->SAMLSessionIndex = $auth->getSessionIndex();
+
         $member->write();
-        // This will trigger LDAP update through LDAPMemberExtension::memberLoggedIn.
-        // The LDAP update will also write the Member record. We shouldn't write before
-        // calling this, as any onAfterWrite hooks that attempt to update LDAP won't
-        // have the Username field available yet for new Member records, and fail.
-        // Both SAML and LDAP identify Members by the GUID field.
+
+
+        // This will trigger LDAP update through LDAPMemberExtension::memberLoggedIn, if the LDAP module is installed.
+        // The LDAP update will also write the Member record a second time, but the member *must* be written before
+        // IdentityStore->logIn() is called, otherwise the identity store throws an exception.
+        // Both SAML and LDAP identify Members by the same GUID field.
+        $member->write();
+
+        /** @var IdentityStore $identityStore */
+        $identityStore = Injector::inst()->get(IdentityStore::class);
+        $identityStore->logIn($member, false, $this->getRequest());
 
         // $member->write();
         
@@ -141,7 +220,8 @@ class SAMLController extends Controller
     public function metadata()
     {
         try {
-            $auth = Injector::inst()->get('SilverStripe\\SAML\\Helpers\\SAMLHelper')->getSAMLAuth();
+            /** @var Auth $auth */
+            $auth = Injector::inst()->get(SAMLHelper::class)->getSAMLAuth();
             $settings = $auth->getSettings();
             $metadata = $settings->getSPMetadata();
             $errors = $settings->validateMetadata($metadata);
@@ -149,9 +229,9 @@ class SAMLController extends Controller
                 header('Content-Type: text/xml');
                 echo $metadata;
             } else {
-                throw new \OneLogin_Saml2_Error(
+                throw new Error(
                     'Invalid SP metadata: ' . implode(', ', $errors),
-                    \OneLogin_Saml2_Error::METADATA_SP_INVALID
+                    Error::METADATA_SP_INVALID
                 );
             }
         } catch (Exception $e) {
@@ -187,6 +267,52 @@ class SAMLController extends Controller
     }
 
     /**
+     * If processing reaches here, then the user is authenticated but potentially not valid. We first need to confirm
+     * that they are not an attacker performing a SAML replay attack (capturing the raw traffic from a compromised
+     * device and then re-submitting the same SAML response).
+     *
+     * To combat this, we store SAML response IDs for the amount of time they're valid for (plus a configurable offset
+     * to account for potential time skew), and if the ID has been seen before we log an error message and return true
+     * (which indicates that this specific request is a replay attack).
+     *
+     * If no replay attack is detected, then the SAML response is logged so that future requests can be blocked.
+     *
+     * @param Auth $auth The Auth object that includes the processed response
+     * @param string $uniqueErrorId The error code to use when logging error messages for this given error
+     * @return bool true if this response is a replay attack, false if it's the first time we've seen the ID
+     */
+    protected function checkForReplayAttack(Auth $auth, $uniqueErrorId = '')
+    {
+        $responseId = $auth->getLastMessageId();
+        $expiry = $auth->getLastAssertionNotOnOrAfter(); // Note: Expiry will always be stored and returned in UTC
+
+        // Search for any SAMLResponse objects where the response ID is the same and the expiry is within the range
+        $count = SAMLResponse::get()->filter(['ResponseID' => $responseId])->count();
+
+        if ($count > 0) {
+            // Response found, therefore this is a replay attack - log the error and return false so the user is denied
+            $this->getLogger()->error(sprintf(
+                '[%s] SAML replay attack detected! Response ID "%s", expires "%s", client IP "%s"',
+                $uniqueErrorId,
+                $responseId,
+                $expiry,
+                $this->getRequest()->getIP()
+            ));
+
+            return true;
+        } else {
+            // No attack detected, log the SAML response
+            $response = new SAMLResponse([
+                'ResponseID' => $responseId,
+                'Expiry' => $expiry
+            ]);
+
+            $response->write();
+            return false;
+        }
+    }
+
+    /**
      * Get a logger
      *
      * @return LoggerInterface
@@ -203,6 +329,6 @@ class SAMLController extends Controller
      */
     public function getForm()
     {
-        return Injector::inst()->get(SAMLLoginForm::class);
+        return Injector::inst()->get(SAMLLoginForm::class, true, [$this, SAMLAuthenticator::class, 'LoginForm']);
     }
 }

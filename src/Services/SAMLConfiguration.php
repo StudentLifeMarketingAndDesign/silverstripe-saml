@@ -2,7 +2,7 @@
 
 namespace SilverStripe\SAML\Services;
 
-use OneLogin_Saml2_Constants;
+use OneLogin\Saml2\Constants;
 use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\Core\Config\Configurable;
 use SilverStripe\Control\Director;
@@ -46,6 +46,32 @@ class SAMLConfiguration
     private static $IdP;
 
     /**
+     * @var array List of valid AuthN contexts that the IdP can use to authenticate a user. Will be passed to the IdP in
+     * every AuthN request (e.g. every login attempt made by a user). The default values should work for ADFS 2.0, but
+     * can be overridden if needed.
+     */
+    private static $authn_contexts;
+
+    /**
+     * @config
+     * @var bool Whether or not we expect to receive a binary NameID from the IdP. We expect to receive a binary NameID
+     * from ADFS, but don't expect it from Azure AD or most other SAML implementations that provide GUIDs.
+     *
+     * Defaults to true to preserve backwards compatibility (ADFS).
+     */
+    private static $expect_binary_nameid = true;
+
+    /**
+     * @config
+     * @var bool Whether or not we allow searching for existing members in the SilverStripe database based on their
+     * email address. Marked as insecure because if warnings in developer documentation are not read and understood,
+     * this can provide access to the website to people who should not otherwise have access.
+     *
+     * Defaults to false to prevent looking up members based on email address.
+     */
+    private static $allow_insecure_email_linking = false;
+
+    /**
      * @return array
      */
     public function asArray()
@@ -57,13 +83,14 @@ class SAMLConfiguration
 
         // SERVICE PROVIDER SECTION
         $sp = $this->config()->get('SP');
+
         $spCertPath = Director::is_absolute($sp['x509cert'])
             ? $sp['x509cert']
             : sprintf('%s/%s', BASE_PATH, $sp['x509cert']);
         $spKeyPath = Director::is_absolute($sp['privateKey'])
             ? $sp['privateKey']
             : sprintf('%s/%s', BASE_PATH, $sp['privateKey']);
-
+            
         // set baseurl for SAML messages coming back to the SP
         //$conf['baseurl'] = $sp['entityId'];
 
@@ -71,9 +98,10 @@ class SAMLConfiguration
         $conf['sp']['assertionConsumerService'] = [
             'url' => Director::absoluteBaseURL() . 'saml/acs',
             'binding' => OneLogin_Saml2_Constants::BINDING_HTTP_POST
+
         ];
         $conf['sp']['NameIDFormat'] = isset($sp['nameIdFormat']) ?
-            $sp['nameIdFormat'] : OneLogin_Saml2_Constants::NAMEID_TRANSIENT;
+            $sp['nameIdFormat'] : Constants::NAMEID_TRANSIENT;
         $conf['sp']['x509cert'] = file_get_contents($spCertPath);
         $conf['sp']['privateKey'] = file_get_contents($spKeyPath);
 
@@ -82,12 +110,12 @@ class SAMLConfiguration
         $conf['idp']['entityId'] = $idp['entityId'];
         $conf['idp']['singleSignOnService'] = [
             'url' => $idp['singleSignOnService'],
-            'binding' => OneLogin_Saml2_Constants::BINDING_HTTP_REDIRECT,
+            'binding' => Constants::BINDING_HTTP_REDIRECT,
         ];
         if (isset($idp['singleLogoutService'])) {
             $conf['idp']['singleLogoutService'] = [
                 'url' => $idp['singleLogoutService'],
-                'binding' => OneLogin_Saml2_Constants::BINDING_HTTP_REDIRECT,
+                'binding' => Constants::BINDING_HTTP_REDIRECT,
             ];
         }
 
@@ -99,6 +127,22 @@ class SAMLConfiguration
         // SECURITY SECTION
         $security = $this->config()->get('Security');
         $signatureAlgorithm = $security['signatureAlgorithm'];
+
+        $authnContexts = $this->config()->get('authn_contexts');
+        $disableAuthnContexts = $this->config()->get('disable_authn_contexts');
+
+        if ((bool)$disableAuthnContexts) {
+            $authnContexts = false;
+        } else {
+            if (!is_array($authnContexts)) {
+                // Fallback to default contexts if the supplied value isn't valid
+                $authnContexts = [
+                    'urn:federation:authentication:windows',
+                    'urn:oasis:names:tc:SAML:2.0:ac:classes:Password',
+                    'urn:oasis:names:tc:SAML:2.0:ac:classes:X509',
+                ];
+            }
+        }
 
         $conf['security'] = [
             /** signatures and encryptions offered */
@@ -137,11 +181,8 @@ class SAMLConfiguration
             // 'exact' 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport'
             // Set an array with the possible auth context values:
             // array ('urn:oasis:names:tc:SAML:2.0:ac:classes:Password', 'urn:oasis:names:tc:SAML:2.0:ac:classes:X509'),
-            'requestedAuthnContext' => [
-                'urn:federation:authentication:windows',
-                'urn:oasis:names:tc:SAML:2.0:ac:classes:Password',
-                'urn:oasis:names:tc:SAML:2.0:ac:classes:X509',
-            ],
+            'requestedAuthnContext' => $authnContexts,
+
             // Indicates if the SP will validate all received xmls.
             // (In order to validate the xml, 'strict' and 'wantXMLValidation' must be true).
             'wantXMLValidation' => true,

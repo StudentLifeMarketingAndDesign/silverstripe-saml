@@ -4,7 +4,22 @@
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/silverstripe/silverstripe-saml/badges/quality-score.png)](https://scrutinizer-ci.com/g/silverstripe/silverstripe-saml/)
 [![codecov](https://codecov.io/gh/silverstripe/silverstripe-saml/branch/master/graph/badge.svg)](https://codecov.io/gh/silverstripe/silverstripe-saml)
 
-# NOTE: Module is unstable and untested
+## Table of Contents
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+
+- [Introduction](#introduction)
+- [Requirements](#requirements)
+- [Overview](#overview)
+- [Security](#security)
+- [In-depth guides](#in-depth-guides)
+  - [For SilverStripe developers](#for-silverstripe-developers)
+  - [For identity provider administrators](#for-identity-provider-administrators)
+- [Changelog](#changelog)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Introduction
 
@@ -14,7 +29,7 @@ This component can also be used alongside the default SilverStripe authenticatio
 
 ## Requirements
 
- * PHP 5.6+ with extensions: openssl, dom, and mcrypt
+ * PHP 5.6+ with extensions: openssl, dom
  * SilverStripe 4.0+
  * Active Directory Federation Services 2.0 or greater (ADFS)
  * HTTPS endpoint on SilverStripe site
@@ -40,7 +55,7 @@ The intended counterparty for this module is the [Active Directory Federation Se
 
 ADFS uses a claims-based access control authorization model to maintain application security and implement federated identity. We rely on this mechanism for authentication, and for automated synchronisation of some basic personal details into SilverStripe.
 
-SAML doesn't allow you to store additional user attributes. If this is desired, you can optionally install the [silverstripe-ldap](https://github.com/silverstripe/silverstripe-ldap) module and run alongside to synchronise custom user attributes from an Active Directory server.
+This module doesn't allow you to store additional user attributes. If this is desired, you can optionally install the [silverstripe-ldap](https://github.com/silverstripe/silverstripe-ldap) module and run alongside to synchronise custom user attributes from an Active Directory server.
 
 ## Security
 
@@ -48,15 +63,20 @@ With appropriate configuration, this module provides a secure means of authentic
 
 For secure communication over the internet during the SAML authentication process, users must communicate with SilverStripe and ADFS using HTTPS. Similarly, for AD authentication to be secure users must access the SilverStripe site using HTTPS.
 
-SilverStripe trusts ADFS responses based on pre-shared x509 certificates. These certificates are exchanged between the Identity Provider (ADFS) and the Service Provider (SilverStripe site) during the initial configuration phase.
-
-AD user synchronisation and authentication is hidden behind the backend (server to server communication), but must still use encrypted LDAP communication to prevent eavesdropping (either StartTLS or SSL - this is configurable). If the webserver and the AD server are hosted in different locations, a VPN could also be used to further encapsulate the traffic going over the public internet.
+SilverStripe trusts ADFS responses based on pre-shared X509 certificates. These certificates are exchanged between the Identity Provider (ADFS) and the Service Provider (SilverStripe site) during the initial configuration phase.
 
 ## In-depth guides
 
+### For SilverStripe developers
+
 * [Developer guide](docs/en/developer.md) - configure your SilverStripe site
-* [ADFS administrator guide](docs/en/adfs.md) - prepare the Identity Provider
 * [Troubleshooting](docs/en/troubleshooting.md) - common problems
+
+### For identity provider administrators
+
+These guides will help you prepare your identity provider and configure it to work with the module correctly.
+* [ADFS administrator guide](docs/en/adfs.md)
+* [Azure AD administrator guide](docs/en/azure-ad.md)
 
 ## Changelog
 

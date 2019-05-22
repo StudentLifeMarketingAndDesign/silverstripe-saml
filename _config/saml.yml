@@ -17,8 +17,6 @@ SilverStripe\Security\Member:
     'silverstripeRoles' : 'silverstripeRoles'
 SilverStripe\Security\Security:
   logout_url: 'Security/SamlLogout'
-  extensions:
-    - SilverStripe\SAML\Authenticators\SAMLSecurityExtension
 
 SilverStripe\Core\Injector\Injector:
   SAMLConfService: SilverStripe\SAML\Services\SAMLConfiguration
@@ -42,6 +40,10 @@ SilverStripe\SAML\Services\SAMLConfiguration:
     entityId: "iowafed-test:idp:uiowa.edu"
     x509cert: "/local/www/certs/idp-test.uiowa.edu.SAMLsigning_8443.cert"
     singleSignOnService: "https://idp-test.uiowa.edu/idp/profile/SAML2/Redirect/SSO"
+
+  debug: false
+  expect_binary_nameid: true
+  allow_insecure_email_linking: false
   Security:
     signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 ---
