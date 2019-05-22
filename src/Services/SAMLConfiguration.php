@@ -90,9 +90,9 @@ class SAMLConfiguration
         $spKeyPath = Director::is_absolute($sp['privateKey'])
             ? $sp['privateKey']
             : sprintf('%s/%s', BASE_PATH, $sp['privateKey']);
-            
+
         // set baseurl for SAML messages coming back to the SP
-        //$conf['baseurl'] = $sp['entityId'];
+        $conf['baseurl'] = Director::absoluteBaseURL() . 'saml';
 
         $conf['sp']['entityId'] = $sp['entityId'];
         $conf['sp']['assertionConsumerService'] = [
