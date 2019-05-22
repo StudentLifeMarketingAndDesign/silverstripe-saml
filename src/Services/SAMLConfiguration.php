@@ -97,7 +97,7 @@ class SAMLConfiguration
         $conf['sp']['entityId'] = $sp['entityId'];
         $conf['sp']['assertionConsumerService'] = [
             'url' => Director::absoluteBaseURL() . 'saml/acs',
-            'binding' => OneLogin_Saml2_Constants::BINDING_HTTP_POST
+            'binding' => Constants::BINDING_HTTP_POST
 
         ];
         $conf['sp']['NameIDFormat'] = isset($sp['nameIdFormat']) ?
