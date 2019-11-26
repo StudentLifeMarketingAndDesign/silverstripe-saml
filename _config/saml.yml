@@ -23,8 +23,8 @@ SilverStripe\SAML\Authenticators\SAMLAuthenticator:
   name: "HawkID Login"
   
 ---
-Only:
-  environment: 'dev'
+Except:
+  environment: 'live'
 ---
 SilverStripe\SAML\Services\SAMLConfiguration:
   strict: true
@@ -45,8 +45,8 @@ SilverStripe\SAML\Services\SAMLConfiguration:
   Security:
     signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 ---
-Except:
-  environment: 'dev'
+Only:
+  environment: 'live'
 ---
 SilverStripe\SAML\Services\SAMLConfiguration:
   strict: true
