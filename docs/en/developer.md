@@ -21,6 +21,7 @@ We assume ADFS 2.0 or greater is used as an IdP.
   - [Service Provider (SP)](#service-provider-sp)
   - [Identity Provider (IdP)](#identity-provider-idp)
   - [Additional configuration for Azure AD](#additional-configuration-for-azure-ad)
+  - [GUID Transformation](#guid-transformation)
 - [Establish trust](#establish-trust)
 - [Configure SilverStripe Authenticators](#configure-silverstripe-authenticators)
   - [Show the SAML Login button on login form](#show-the-saml-login-button-on-login-form)
@@ -146,8 +147,13 @@ SilverStripe\SAML\Services\SAMLConfiguration:
 
 SilverStripe\SAML\Extensions\SAMLMemberExtension:
   claims_field_mappings:
-    - 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name': 'Email'
+    'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name': 'Email'
 ```
+
+### GUID Transformation
+
+If you prefer to receive the GUID in lower-case or upper-case format you can use the 
+`updateGuid()` extension point on `\SilverStripe\SAML\Control\SAMLController`.
 
 ## Establish trust
 
@@ -320,6 +326,7 @@ For more details on what options are possible for Microsoft ADFS, [check out MSD
 If you want to customise the requested options, you can do this via YML. For example, the below configuration ensures that only `windows` authentication is considered valid:
 
 ```yaml
+
 ---
 Name: samlconfig
 After:
@@ -330,7 +337,7 @@ SilverStripe\SAML\Services\SAMLConfiguration:
     - 'urn:federation:authentication:windows'
 ```
 
-You can also set `authn_contexts: false` which will disable the sending of AuthN contexts at all, allowing the remote IdP to make its best decision over what to use. This will also not require an exact match (and is therefore not recommended).
+You can also set `disable_authn_contexts: true` which will disable the sending of AuthN contexts at all, allowing the remote IdP to make its best decision over what to use. This will also not require an exact match (and is therefore not recommended).
 
 ### Create your own SAML configuration for completely custom settings
 
@@ -341,6 +348,7 @@ This can be done by registering your own `SilverStripe\SAML\Services\SAMLConfigu
 Example:
 
 ```yaml
+
 ---
 Name: samlconfig
 After:
