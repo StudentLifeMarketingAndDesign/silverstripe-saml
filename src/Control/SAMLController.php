@@ -63,6 +63,9 @@ class SAMLController extends Controller
      */
     public function acs()
     {
+
+        SAMLHelper::updateConfigForLocal();
+
         /** @var Auth $auth */
         $auth = Injector::inst()->get(SAMLHelper::class)->getSAMLAuth();
         $caughtException = null;
@@ -176,7 +179,7 @@ class SAMLController extends Controller
             $member = new Member();
             $member->GUID = $guid;
             $member->write();
-            
+
         }
         // Security::setCurrentUser($member);
 
@@ -214,7 +217,7 @@ class SAMLController extends Controller
         $identityStore->logIn($member, false, $this->getRequest());
 
         // $member->write();
-        
+
         // print_r(Security::getCurrentUser());
         return $this->getRedirect();
     }

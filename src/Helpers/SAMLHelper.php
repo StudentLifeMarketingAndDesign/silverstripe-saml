@@ -14,6 +14,10 @@ use SilverStripe\SAML\Authenticators\SAMLLoginHandler;
 use SilverStripe\SAML\Control\SAMLController;
 use SilverStripe\SAML\Services\SAMLConfiguration;
 use OneLogin\Saml2\Auth;
+use SilverStripe\Core\Config\Config;
+
+
+
 
 /**
  * Class SAMLHelper
@@ -124,5 +128,34 @@ class SAMLHelper
         $hex_guid_to_guid_str .= '-' . substr($hex_guid, 16, 4);
         $hex_guid_to_guid_str .= '-' . substr($hex_guid, 20);
         return strtoupper($hex_guid_to_guid_str);
+    }
+
+
+    public static function updateConfigForLocal(){
+        $currentHost =  Director::hostName();
+
+        if($currentHost == 'localhost'){
+            $home = getenv('HOME');
+            $certLocation = $home.'/certs/';
+
+            SAMLConfiguration::config()->SP = [
+                'entityId' => 'https://md.studentlife.uiowa.edu/sp-test',
+                'privateKey' =>  $certLocation.'saml.pem',
+                'x509cert' => $certLocation.'saml.crt',
+                'nameIdFormat' => 'urn:oid:1.2.840.113556.1.4.2'
+            ];
+
+            //TODO: Figure out how to make this work so we don't overwrite all array keys in config:
+            // SAMLConfiguration::config()->SP['privateKey'] = '$certLocation.'saml.pem';
+            // SAMLConfiguration::config()->IdP['entityId'] = 'iowafed-test:idp:uiowa.edu';
+
+
+            SAMLConfiguration::config()->IdP = [
+                'entityId' => 'iowafed-test:idp:uiowa.edu',
+                'x509cert' => $certLocation.'idp-test.uiowa.edu.SAMLsigning_8443.cert',
+                'singleSignOnService' => 'https://idp-test.uiowa.edu/idp/profile/SAML2/Redirect/SSO'
+            ];
+        }
+           // echo $certLocation;
     }
 }

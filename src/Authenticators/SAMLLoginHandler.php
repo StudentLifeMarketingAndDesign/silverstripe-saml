@@ -8,6 +8,11 @@ use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Control\HTTPResponse_Exception;
 use SilverStripe\Control\RequestHandler;
 use SilverStripe\SAML\Helpers\SAMLHelper;
+use SilverStripe\Control\Director;
+use SilverStripe\Core\Config\Config;
+use SilverStripe\SAML\Services\SAMLConfiguration;
+
+
 
 class SAMLLoginHandler extends RequestHandler
 {
@@ -100,6 +105,9 @@ class SAMLLoginHandler extends RequestHandler
      */
     public function doLogin($data, SAMLLoginForm $form, HTTPRequest $request)
     {
+       //Update config for our localhost setup:
+        SAMLHelper::updateConfigForLocal();
+
         $backURL = (isset($data['BackURL']) ? $data['BackURL'] : null);
         $this->helper->redirect($this, $request, $backURL);
     }
