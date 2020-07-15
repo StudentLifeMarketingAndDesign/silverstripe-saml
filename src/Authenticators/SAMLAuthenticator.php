@@ -36,7 +36,7 @@ class SAMLAuthenticator extends MemberAuthenticator
     /**
      * @var string
      */
-    private $name = 'SAML';
+    private $name = 'HawkID';
 
     /**
      * @return string

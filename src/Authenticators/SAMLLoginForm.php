@@ -35,7 +35,7 @@ class SAMLLoginForm extends LoginForm
      */
     public function getAuthenticatorName()
     {
-        return _t(__CLASS__ . '.AUTHENTICATORNAME', 'SAML');
+        return _t(__CLASS__ . '.AUTHENTICATORNAME', 'HawkID');
     }
 
     /**
@@ -86,7 +86,7 @@ class SAMLLoginForm extends LoginForm
     protected function getFormActions()
     {
         return FieldList::create([
-            FormAction::create('dologin', _t('SilverStripe\\Security\\Member.BUTTONLOGIN', 'Log in'))
+            FormAction::create('dologin', 'Log in with your HawkID')
         ]);
     }
 
