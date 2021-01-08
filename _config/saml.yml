@@ -38,8 +38,6 @@ SilverStripe\SAML\Services\SAMLConfiguration:
     entityId: "iowafed-test:idp:uiowa.edu"
     x509cert: "/local/www/certs/idp-test.uiowa.edu.SAMLsigning_8443.cert"
     singleSignOnService: "https://idp-test.uiowa.edu/idp/profile/SAML2/Redirect/SSO"
-
-  debug: false
   expect_binary_nameid: true
   allow_insecure_email_linking: false
   Security:
