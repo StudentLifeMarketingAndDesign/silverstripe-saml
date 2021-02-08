@@ -22,6 +22,7 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 		$contentEditorsGroup = Group::get()->filter(array('Title' => 'Content Authors'))->First();
 		$DslGroup = Group::get()->filter(array('Title' => 'DSL Employees'))->First();
 
+		//TODO: Why can't we create a group programmatically? We can but relationships don't save :(
 		// if (!isset($DslGroup)) {
 		// 	$DslGroup = new Group();
 		// 	$DslGroup->Code = 'dsl-employees';
