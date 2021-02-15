@@ -49,7 +49,7 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 			}
 		}
 
-		//If the local user doesn't have a GUID or is part of the DSL Employee group, look them up and set some basic attributes:
+		//If the local user doesn't have a GUID or a DSL Employee group exists in the system, look them up and set some basic attributes:
 		if ((!$guid) || (isset($DslGroup))) {
 			$userLookup = $this->lookupUser($email);
 			if ($userLookup) {
@@ -61,13 +61,8 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 
 				//If user has Student-Services string in their group, they are a DSL employee.
 				if (strpos($implodedMemberOf, 'Student-Services') !== false) {
-
 					$DslGroup->Members()->add($this->owner);
 					$DslGroup->write();
-
-					// print_r($DslGroup->Members()->toArray());
-					// die;
-
 				} else {
 					//If we didn't find DSL Employees group, remove
 					//them if they're part of the group, since that means they aren't in DSL anymore:
@@ -77,27 +72,6 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 			}
 
 		}
-	}
-
-	public function onAfterWrite() {
-		// $DslGroup = Group::get()->filter(array('Title' => 'DSL Employee'))->First();
-		// if (!$DslGroup) {
-		//     $newGroup = Group::create();
-		//     $newGroup->Title = 'DSL Employee';
-		//     $newGroup->write();
-		//     $DslGroup = $newGroup;
-		// }
-
-		// foreach ($userLookup['memberof'] as $memberTest) {
-		//     //If user has Student-Services string in their group, they are a DSL employee.
-		//     if (strpos($memberTest, 'Student-Services') !== false) {
-		//         $DslGroup->Members()->add($this->owner);
-		//     } else {
-		//         $DslGroup->Members()->remove($this->owner);
-		//     }
-
-		// }
-
 	}
 
 	private function lookupUser($email) {
