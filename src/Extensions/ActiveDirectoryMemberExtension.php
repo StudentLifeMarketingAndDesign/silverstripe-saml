@@ -20,6 +20,9 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 
 		$adminGroup = Group::get()->filter(array('Title' => 'Administrators'))->First();
 		$contentEditorsGroup = Group::get()->filter(array('Title' => 'Content Authors'))->First();
+
+		//Creating this group in the CMS will enable some functionality to automatically pull in people to a DSL group
+		//TODO: Find a way to modularize this with other groups?
 		$DslGroup = Group::get()->filter(array('Title' => 'DSL Employees'))->First();
 
 		//TODO: Why can't we create a group programmatically? We can but relationships don't save :(
