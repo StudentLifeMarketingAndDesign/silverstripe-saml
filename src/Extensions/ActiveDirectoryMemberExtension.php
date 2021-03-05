@@ -25,6 +25,9 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 		//TODO: Find a way to modularize this with other groups?
 		$DslGroup = Group::get()->filter(array('Title' => 'DSL Employees'))->First();
 
+		//Assume member isn't Dsl by default
+		$memberIsDsl = false;
+
 		//TODO: Why can't we create a group programmatically? We can but relationships don't save :(
 		// if (!isset($DslGroup)) {
 		// 	$DslGroup = new Group();
@@ -62,15 +65,25 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 
 				$implodedMemberOf = implode(",", $userLookup['memberof']);
 
-				//If user has Student-Services string in their group, they are a DSL employee.
-				if (strpos($implodedMemberOf, 'Student-Services') !== false) {
-					$DslGroup->Members()->add($this->owner);
-					$DslGroup->write();
-				} else {
-					//If we didn't find DSL Employees group, remove
-					//them if they're part of the group, since that means they aren't in DSL anymore:
+				$validDslAdGroupStrings = array(
+					'Student-Services',
+					'Student-Health',
+				);
+
+				foreach ($validDslAdGroupStrings as $validDslGroupString) {
+					if (strpos($implodedMemberOf, $validDslGroupString) !== false) {
+						$DslGroup->Members()->add($this->owner);
+						$DslGroup->write();
+						$memberIsDsl = true;
+					}
+				}
+
+				//If we looped through all valid group strings and memberIsDsl is never set true, then remove them.
+				if (!$memberIsDsl) {
 					$DslGroup->Members()->remove($this->owner);
 				}
+
+				//If user has Student-Services string in their group, they are a DSL employee.
 
 			}
 
