@@ -80,7 +80,10 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 
 				//If we looped through all valid group strings and memberIsDsl is never set true, then remove them.
 				if (!$memberIsDsl) {
-					$DslGroup->Members()->remove($this->owner);
+					if (isset($DslGroup)) {
+						$DslGroup->Members()->remove($this->owner);
+					}
+
 				}
 
 				//If user has Student-Services string in their group, they are a DSL employee.
