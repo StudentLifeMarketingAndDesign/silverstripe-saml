@@ -65,28 +65,31 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 
 				$implodedMemberOf = implode(",", $userLookup['memberof']);
 
-				$validDslAdGroupStrings = array(
-					'Student-Services',
-					'Student-Health',
-				);
+				if (isset($DslGroup)) {
+					$validDslAdGroupStrings = array(
+						'Student-Services',
+						'Student-Health',
+					);
 
-				foreach ($validDslAdGroupStrings as $validDslGroupString) {
-					if (strpos($implodedMemberOf, $validDslGroupString) !== false) {
-						$DslGroup->Members()->add($this->owner);
-						$DslGroup->write();
-						$memberIsDsl = true;
-					}
-				}
+					foreach ($validDslAdGroupStrings as $validDslGroupString) {
+						if (strpos($implodedMemberOf, $validDslGroupString) !== false) {
+							$DslGroup->Members()->add($this->owner);
+							$DslGroup->write();
+							//If user has a $validDslAdGroup string value in their group, they are a DSL employee.
+							$memberIsDsl = true;
 
-				//If we looped through all valid group strings and memberIsDsl is never set true, then remove them.
-				if (!$memberIsDsl) {
-					if (isset($DslGroup)) {
-						$DslGroup->Members()->remove($this->owner);
+						}
 					}
 
-				}
+					//If we looped through all valid group strings and memberIsDsl is never set true, then remove them.
+					if (!$memberIsDsl) {
+						if (isset($DslGroup)) {
+							$DslGroup->Members()->remove($this->owner);
+						}
 
-				//If user has Student-Services string in their group, they are a DSL employee.
+					}
+
+				}
 
 			}
 

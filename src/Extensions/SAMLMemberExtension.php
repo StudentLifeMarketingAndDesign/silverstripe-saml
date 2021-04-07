@@ -58,8 +58,8 @@ class SAMLMemberExtension extends DataExtension {
 			$fields->removeFieldFromTab('Root', 'Surname');
 		}
 
-		// $fields->removeFieldFromTab('Root', 'Password');
-		// $fields->removeFieldFromTab('Root', 'ConfirmPassword');
+		$fields->removeFieldFromTab('Root', 'Password');
+		$fields->removeFieldFromTab('Root', 'ConfirmPassword');
 
 		$fields->replaceField('GUID', new ReadonlyField('GUID'));
 		$fields->removeFieldFromTab('Root', 'SAMLSessionIndex');
