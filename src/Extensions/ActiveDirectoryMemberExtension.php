@@ -9,6 +9,7 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 
 	private static $db = array(
 		'silverstripeRoles' => 'Text',
+		'AdUsername' => 'Text',
 	);
 
 	private static $required_fields = array(
@@ -16,25 +17,31 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 	);
 
 	public function onBeforeWrite() {
+
+		$guid = $this->owner->GUID;
 		$silverstripeRoles = $this->owner->obj('silverstripeRoles')->getValue();
+		$DslGroup = Group::get()->filter(array('Title' => 'DSL Employees'))->First();
+
+		$this->parseSilverStripeEditorRolesAndGroups($silverstripeRoles);
+		//If the local user doesn't have a GUID (somehow? after all this time? it usually gets sent through SAML) or a DSL Employee group exists in the system, look them up and set/confirm some basic attributes:
+
+		if ((!$guid) || (isset($DslGroup))) {
+			$this->parseNamesAndGroups();
+		}
+	}
+
+	private function parseSilverStripeEditorRolesAndGroups($silverstripeRoles) {
 
 		$adminGroup = Group::get()->filter(array('Title' => 'Administrators'))->First();
 		$contentEditorsGroup = Group::get()->filter(array('Title' => 'Content Authors'))->First();
 
-		//Creating this group in the CMS will enable some functionality to automatically pull in people to a DSL group
-		//TODO: Find a way to modularize this with other groups?
-		$DslGroup = Group::get()->filter(array('Title' => 'DSL Employees'))->First();
-
-		//Assume member isn't Dsl by default
-		$memberIsDsl = false;
-
 		//TODO: Why can't we create a group programmatically? We can but relationships don't save :(
 		// if (!isset($DslGroup)) {
-		// 	$DslGroup = new Group();
-		// 	$DslGroup->Code = 'dsl-employees';
-		// 	$DslGroup->Title = 'DSL Employees';
-		// 	$DslGroup->Sort = 1;
-		// 	$DslGroup->write();
+		//  $DslGroup = new Group();
+		//  $DslGroup->Code = 'dsl-employees';
+		//  $DslGroup->Title = 'DSL Employees';
+		//  $DslGroup->Sort = 1;
+		//  $DslGroup->write();
 
 		// }
 		$guid = $this->owner->GUID;
@@ -55,38 +62,50 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 			}
 		}
 
-		//If the local user doesn't have a GUID or a DSL Employee group exists in the system, look them up and set some basic attributes:
-		if ((!$guid) || (isset($DslGroup))) {
-			$userLookup = $this->lookupUser($email);
-			if ($userLookup) {
-				$this->owner->FirstName = $userLookup['firstName'];
-				$this->owner->Surname = $userLookup['lastName'];
-				$this->owner->GUID = $userLookup['guid'];
+	}
 
-				$implodedMemberOf = implode(",", $userLookup['memberof']);
+	public function parseNamesAndGroups() {
 
-				if (isset($DslGroup)) {
-					$validDslAdGroupStrings = array(
-						'Student-Services',
-						'Student-Health',
-					);
+		$guid = $this->owner->GUID;
+		$email = $this->owner->obj('Email')->getValue();
 
-					foreach ($validDslAdGroupStrings as $validDslGroupString) {
-						if (strpos($implodedMemberOf, $validDslGroupString) !== false) {
-							$DslGroup->Members()->add($this->owner);
-							$DslGroup->write();
-							//If user has a $validDslAdGroup string value in their group, they are a DSL employee.
-							$memberIsDsl = true;
+		//Creating this group in the CMS will enable some functionality to automatically pull in people to a DSL group
+		//TODO: Find a way to modularize this with other groups?
+		$DslGroup = Group::get()->filter(array('Title' => 'DSL Employees'))->First();
 
-						}
+		//Assume member isn't Dsl by default
+		$memberIsDsl = false;
+		// if (true) {
+		$userLookup = $this->lookupUser($email);
+
+		if ($userLookup) {
+			$this->owner->FirstName = $userLookup['firstName'];
+			$this->owner->Surname = $userLookup['lastName'];
+			$this->owner->GUID = $userLookup['guid'];
+			$this->owner->AdUsername = $userLookup['username'];
+
+			$implodedMemberOf = implode(",", $userLookup['memberof']);
+
+			if (isset($DslGroup)) {
+				$validDslAdGroupStrings = array(
+					'Student-Services',
+					'Student-Health',
+				);
+
+				foreach ($validDslAdGroupStrings as $validDslGroupString) {
+					if (strpos($implodedMemberOf, $validDslGroupString) !== false) {
+						$DslGroup->Members()->add($this->owner);
+						$DslGroup->write();
+						//If user has a $validDslAdGroup string value in their group, they are a DSL employee.
+						$memberIsDsl = true;
+
 					}
+				}
 
-					//If we looped through all valid group strings and memberIsDsl is never set true, then remove them.
-					if (!$memberIsDsl) {
-						if (isset($DslGroup)) {
-							$DslGroup->Members()->remove($this->owner);
-						}
-
+				//If we looped through all valid group strings and memberIsDsl is never set true, then remove them.
+				if (!$memberIsDsl) {
+					if (isset($DslGroup)) {
+						$DslGroup->Members()->remove($this->owner);
 					}
 
 				}
@@ -94,6 +113,7 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 			}
 
 		}
+
 	}
 
 	private function lookupUser($email) {
@@ -114,7 +134,7 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 			// verify binding
 			if ($ldapbind) {
 				//do stuff
-				$result = ldap_search($ldapconn, $ldaptree, "uiowaADNotificationAddress=" . $email, array("uiowaADNotificationAddress=", "sn", "givenName", "objectGUID", "memberOf")) or die("Error in search query: " . ldap_error($ldapconn));
+				$result = ldap_search($ldapconn, $ldaptree, "uiowaADNotificationAddress=" . $email, array("uiowaADNotificationAddress=", "cn", "sn", "givenName", "objectGUID", "memberOf")) or die("Error in search query: " . ldap_error($ldapconn));
 
 				$data = ldap_get_entries($ldapconn, $result);
 
@@ -123,6 +143,7 @@ class ActiveDirectoryMemberExtension extends DataExtension {
 					$resultArray['guid'] = $memberGuid;
 					$resultArray['firstName'] = $data[0]["givenname"][0];
 					$resultArray['lastName'] = $data[0]["sn"][0];
+					$resultArray['username'] = $data[0]["cn"][0];
 					$resultArray['memberof'] = $data[0]["memberof"];
 					return $resultArray;
 				}
